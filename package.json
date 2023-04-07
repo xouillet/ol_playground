@@ -8,6 +8,10 @@
   },
   "scripts": {
     "start": "vite",
+    "dev": "vite",
     "build": "vite build"
+  },
+  "stackblitz": {
+    "startCommand": "npm install && npm start"
   }
 }
