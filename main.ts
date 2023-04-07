@@ -5,12 +5,11 @@ import View from "ol/View.js";
 import { State } from "ol/render";
 import { Projection } from "ol/proj";
 import ImageLayer from "ol/layer/Image";
-import { defaults as defaultControls } from "ol/control.js";
 import Static from "ol/source/ImageStatic.js";
 import Feature from "ol/Feature";
 import Select, { SelectEvent } from "ol/interaction/Select.js";
 import { Coordinate } from "ol/coordinate";
-import { getCenter, getWidth, getHeight, getBottomLeft } from "ol/extent";
+import { getWidth, getHeight, getBottomLeft } from "ol/extent";
 import { Polygon } from "ol/geom";
 import Style from "ol/style/Style";
 
@@ -58,37 +57,27 @@ function rectangle(pose: Pose) {
       [pose.x - robot_width / 2, pose.y + robot_length / 2],
     ],
   ]);
-  polygon.rotate(pose.t + Math.PI / 2, [pose.x, pose.y]);
-  polygon.set("angle", pose.t + Math.PI / 2);
+
   return polygon;
 }
 
 function featureRenderer(
   pixelCoords: Coordinate | Coordinate[] | Coordinate[][],
-  state: State
+  state: State,
+  selected: boolean
 ) {
   pixelCoords = pixelCoords as Coordinate[][];
 
   const context = state.context;
-  const geometry = new Polygon([]);
-  const theta =
-  Math.atan2(
-    pixelCoords[0][1][1] - pixelCoords[0][0][1],
-    pixelCoords[0][1][0] - pixelCoords[0][0][0]
-  ) * -1;
-  // Polygon rotated in meters
+  const geometry = state.geometry.clone() as Polygon;
   geometry.setCoordinates(pixelCoords);
-  // Polygon rotated in pixels
-  geometry.rotate(theta, getCenter(geometry.getExtent()));
-  // Polygon unrotated in pixels
-  // Compute new extent and its derivatives
   const extent = geometry.getExtent();
-  const center = getCenter(extent);
   const width = getWidth(extent);
   const height = getHeight(extent);
   const bottomLeft = getBottomLeft(extent);
   const left = bottomLeft[0];
   const bottom = bottomLeft[1];
+
   const svgwidth = 426;
   const svgheight = 670;
   const img = new Image();
@@ -96,7 +85,7 @@ function featureRenderer(
     `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgwidth} ${svgheight}" height="${svgheight}px" width="${svgwidth}px">
     <path 
-    fill="${state.feature.get("selected") ? "#800" : "#033"}" 
+    fill="${selected ? "#800" : "#333"}" 
       stroke="none" 
       stroke-linecap="round" 
       stroke-linejoin="round" 
@@ -115,22 +104,22 @@ function featureRenderer(
     </svg>
     `
   )}`;
-  // Save current context config
-  context.save();
-  // Translate context to center of polygon unrotated
-  context.translate(center[0], center[1]);
-  // Apply rotation to canvas
-  context.rotate(Math.PI - theta);
-  // Draw SVG image with canvas rotation on translated position
-  context.drawImage(img, left - center[0], bottom - center[1], width, height);
-  // Restore saved context config
-  //context.restore();
+  context.drawImage(img, left, bottom, width, height);
 }
 
 let pose = { x: 7, y: 6.6, t: 0.5 };
 const robotFeature = new Feature(rectangle(pose));
 const robotStyle = new Style({
-  renderer: featureRenderer
+  renderer: (
+    pixelCoords: Coordinate | Coordinate[] | Coordinate[][],
+    state: State
+  ) => featureRenderer(pixelCoords, state, false),
+});
+const robotStyleSel = new Style({
+  renderer: (
+    pixelCoords: Coordinate | Coordinate[] | Coordinate[][],
+    state: State
+  ) => featureRenderer(pixelCoords, state, true),
 });
 robotFeature.setStyle(robotStyle);
 
@@ -140,32 +129,6 @@ const robot_layer = new VectorLayer({
 _map.addLayer(robot_layer);
 
 const select = new Select({
-  style: robotStyle,
+  style: robotStyleSel,
 });
-select.on("select", function (e: SelectEvent) {
-  robotFeature.set("selected", e.selected.length > 0);
-  robotFeature.changed();
-});
-
 _map.addInteraction(select);
-
-function move() {
-  let t = (pose.t + 2 * (Math.random() - 0.5)) % 6.28;
-  if (pose.x < 0) {
-    t = 0;
-  }
-  if (pose.x > 14.25) {
-    t = 3.14;
-  }
-  if (pose.y < 0) {
-    t = 1.57;
-  }
-  if (pose.y > 14.25) {
-    t = -1.57;
-  }
-  pose = { x: pose.x + 0.1 * Math.cos(t), y: pose.y + 0.1 * Math.sin(t), t: t };
-  robotFeature.setGeometry(rectangle(pose));
-}
-move()
-//setInterval(move, 500);
-
