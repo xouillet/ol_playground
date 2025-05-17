@@ -42,31 +42,30 @@ const all = new Map({
     maxZoom: 8,
   }),
 });
-const [angle, dx, dy] = [-2.632765769958496,678,1104];
-//const [angle, dx, dy] = [0,678,1104];
-
-const [mw,mh] = [773, 709]
-const map_extent = [0,0,mw,mh].map(scale);
-const map = new ImageLayer({
-  source: new Static({
-    url: "./current_map-2.webp",
-    projection: robocc_projection,
-    imageExtent: map_extent,
-  }),
-});
-all.addLayer(map);
 
 const [rw, rh] = [1041, 1539]
-const remap_extent = [-dx, mh-rh+dy, rw-dx, mh+dy].map(scale);
+const remap_extent = [0, 0, rw, rh].map(scale);
 const remap = new ImageLayer({
   source: new Static({
     url: "./current_remap-2.webp",
-    projection: roboccrot_projection,
+    projection: robocc_projection,
     imageExtent: remap_extent,
+  }),
+});
+all.addLayer(remap);
+
+const [angle, dx, dy] = [-2.632765769958496,678,1104];
+const [mw,mh] = [773, 709]
+const map_extent = [dx,rh-mh-dy,dx+mw,rh-dy].map(scale);
+const map = new ImageLayer({
+  source: new Static({
+    url: "./current_map-2.webp",
+    projection: roboccrot_projection,
+    imageExtent: map_extent,
   }),
   opacity: 0.7,
 });
-all.addLayer(remap);
+all.addLayer(map);
 all.getView().fit(remap_extent);
 
 
@@ -74,9 +73,9 @@ addCoordinateTransforms(
   robocc_projection,
   roboccrot_projection,
   (c: Coordinate) => {
-    const rotc = [0,mh].map(scale)
+    const rotc = [dx,rh-dy].map(scale)
     add(c, rotc.map(x=>-x))
-    rotate(c, -angle)
+    rotate(c, angle)
     add(c, rotc.map(x=>x))
     return c;
   },
