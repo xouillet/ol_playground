@@ -21,65 +21,69 @@ export interface Pose {
 
 const scale = (x: number) => (x * 5) / 100;
 
-const robocc_projection = new Projection({
+const map_projection = new Projection({
   code: "Robocc",
   units: "m",
   extent: [-200, -200, 200, 200],
 });
-const roboccrot_projection = new Projection({
-  code: "RoboccRot",
-  units: "m",
-  extent: [-200, -200, 200, 200],
-});
+addProjection(map_projection);
 
 const all = new Map({
   target: "map",
   layers: [],
   view: new View({
-    projection: robocc_projection,
+    projection: map_projection,
     center: [7, 7],
     zoom: 2,
     maxZoom: 8,
   }),
 });
 
-const [rw, rh] = [1041, 1539]
-const remap_extent = [0, 0, rw, rh].map(scale);
-const remap = new ImageLayer({
-  source: new Static({
-    url: "./current_remap-2.webp",
-    projection: robocc_projection,
-    imageExtent: remap_extent,
-  }),
-});
-all.addLayer(remap);
-
-const [angle, dx, dy] = [-2.632765769958496,678,1104];
-const [mw,mh] = [773, 709]
-const map_extent = [dx,rh-dy-mh,dx+mw,-dy+rh].map(scale);
+const map_extent = [0, 0, 773, 709].map(scale);
 const map = new ImageLayer({
   source: new Static({
     url: "./current_map-2.webp",
-    projection: roboccrot_projection,
+    projection: map_projection,
     imageExtent: map_extent,
+  }),
+});
+all.addLayer(map);
+
+const [angle, dx, dy] = [-2.632765769958496, 678, 1104];
+
+const remap_extent = [0, 0, 1041, 1539].map(scale);
+const remap_projection = new Projection({
+  code: "RoboccRemap",
+  units: "m",
+  extent: remap_extent,
+});
+addCoordinateTransforms(
+  "Robocc",
+  remap_projection,
+  (c: Coordinate) => {
+    add(
+      c,
+      getCenter(remap_extent).map((x) => -x)
+    );
+    rotate(c, -angle
+    );
+    add(
+      c,
+      getCenter(remap_extent).map((x) => x)
+    );
+    add(c, [scale(dx), scale(dy)])
+    return c;
+  },
+  (c) => c
+);
+
+const remap = new ImageLayer({
+  source: new Static({
+    url: "./current_remap-2.webp",
+    projection: remap_projection,
+    imageExtent: remap_extent,
   }),
   opacity: 0.7,
 });
-all.addLayer(map);
+all.addLayer(remap);
 all.getView().fit(remap_extent);
-
-
-addCoordinateTransforms(
-  robocc_projection,
-  roboccrot_projection,
-  (c: Coordinate) => {
-    const rotc = [dx,rh-dy].map(scale)
-    add(c, rotc.map(x=>-x))
-    rotate(c, angle)
-    add(c, rotc.map(x=>x))
-    return c;
-  },
-  (c) => {
-    return c;
-  }
-);
